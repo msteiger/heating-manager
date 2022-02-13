@@ -1,0 +1,18 @@
+*.class
+
+# Package Files #
+*.jar
+*.war
+*.ear
+
+# ignore generated maven stuff
+target/
+
+bin/
+
+.classpath
+.project
+.settings/
+
+*.iml
+.idea/
