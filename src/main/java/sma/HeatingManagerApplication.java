@@ -1,5 +1,6 @@
 package sma;
 
+import static com.pi4j.io.gpio.RaspiPin.GPIO_13;
 import static com.pi4j.io.gpio.RaspiPin.GPIO_17;
 import static com.pi4j.io.gpio.RaspiPin.GPIO_22;
 import static com.pi4j.io.gpio.RaspiPin.GPIO_27;
@@ -12,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import sma.domain.em.DataBlock;
 import sma.service.EnergyMeterService;
 import sma.service.Heater;
+import sma.service.HeaterMeterService;
 
 
 public class HeatingManagerApplication {
@@ -22,6 +24,8 @@ public class HeatingManagerApplication {
 
         EnergyMeterService meter = new EnergyMeterService();
         Heater heater = new Heater(GPIO_22, GPIO_27, GPIO_17);
+
+        HeaterMeterService heaterMeter = new HeaterMeterService(GPIO_13);
 
         boolean logIdleDead = true;
         boolean logIdleMax = true;
