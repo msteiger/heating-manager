@@ -1,5 +1,9 @@
 package sma.service;
 
+import static java.lang.Math.PI;
+import static java.lang.Math.asin;
+import static java.lang.Math.sqrt;
+
 import java.time.Duration;
 import java.time.Instant;
 
@@ -17,8 +21,6 @@ import com.pi4j.io.gpio.RaspiPinNumberingScheme;
 import com.pi4j.io.gpio.event.GpioPinDigitalStateChangeEvent;
 import com.pi4j.io.gpio.event.GpioPinListenerDigital;
 
-import static java.lang.Math.*;
-
 public class HeaterMeterService {
 
     private static final Logger log = LoggerFactory.getLogger(HeaterMeterService.class);
@@ -34,6 +36,8 @@ public class HeaterMeterService {
     private double wattHours = 0;
     private Instant startTime = Instant.now();
 
+    private int pfcLevel;
+
     public HeaterMeterService(Pin pinSwitchOnOff) {
         GpioFactory.setDefaultProvider(new RaspiGpioProvider(RaspiPinNumberingScheme.BROADCOM_PIN_NUMBERING));
         GpioController controller = GpioFactory.getInstance();
@@ -48,6 +52,18 @@ public class HeaterMeterService {
                 handleStateChange(state);
             }
         });
+    }
+
+    public double getWattHours() {
+        return wattHours;
+    }
+
+    public Instant getStartTime() {
+        return startTime;
+    }
+
+    public int getPfcLevel() {
+        return pfcLevel;
     }
 
     private void handleStateChange(PinState state) {
@@ -80,14 +96,25 @@ public class HeaterMeterService {
         double timeInSecs = pulseGap.toMillis() / 1000.0;
         double power = 1000.0 * 1.8 / timeInSecs;
 
-        int pfcLevel = (int)(power / 1130.0 * 100);
-
         // y=(-cos(x*pi)+1)/2 from 0 to 1  --> steady increase from 0 to 1
-        // solve for x: 2*asin(sqrt(y))/PI
+        // solve for x: 2*asin(sqrt(y))/PI --> not sure why, wolfram alpha solved it like this
 
         double y = power / 1130.0;
+        double x = 2.0 * asin(sqrt(y))/PI;
 
-        int sinPfcLevel = (int) (100 * 2.0 * asin(sqrt(y))/PI);
+        pfcLevel = (int) (0.5 + 100 * x); // add 0.5 to round properly to closest int
+
+//        10           : 25
+//        20           : 93
+//        30           : 221
+//        40           : 392
+//        50           : 577
+//        60           : 755
+//        70           : 924
+//        80           : 1053
+//        90           : 1102
+//        100          : 1128
+
 
 //        log.info("Consumption: " + (int)power + " W - PFC levels: " + pfcLevel + "/" + sinPfcLevel);
     }
