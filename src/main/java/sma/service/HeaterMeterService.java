@@ -11,13 +11,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.pi4j.io.gpio.GpioController;
-import com.pi4j.io.gpio.GpioFactory;
 import com.pi4j.io.gpio.GpioPinDigitalInput;
 import com.pi4j.io.gpio.Pin;
 import com.pi4j.io.gpio.PinPullResistance;
 import com.pi4j.io.gpio.PinState;
-import com.pi4j.io.gpio.RaspiGpioProvider;
-import com.pi4j.io.gpio.RaspiPinNumberingScheme;
 import com.pi4j.io.gpio.event.GpioPinDigitalStateChangeEvent;
 import com.pi4j.io.gpio.event.GpioPinListenerDigital;
 
@@ -33,16 +30,14 @@ public class HeaterMeterService {
 
     private Instant lastOn = Instant.MIN;
 
+    private double power = 0;
     private double wattHours = 0;
     private Instant startTime = Instant.now();
-
     private int pfcLevel;
 
-    public HeaterMeterService(Pin pinSwitchOnOff) {
-        GpioFactory.setDefaultProvider(new RaspiGpioProvider(RaspiPinNumberingScheme.BROADCOM_PIN_NUMBERING));
-        GpioController controller = GpioFactory.getInstance();
+    public HeaterMeterService(GpioController controller, Pin sZeroBusInput) {
 
-        GpioPinDigitalInput switchGpio = controller.provisionDigitalInputPin(pinSwitchOnOff, PinPullResistance.PULL_UP);
+        GpioPinDigitalInput switchGpio = controller.provisionDigitalInputPin(sZeroBusInput, PinPullResistance.PULL_UP);
 
         switchGpio.addListener(new GpioPinListenerDigital() {
 
@@ -64,6 +59,10 @@ public class HeaterMeterService {
 
     public int getPfcLevel() {
         return pfcLevel;
+    }
+
+    public double getPower() {
+        return power;
     }
 
     private void handleStateChange(PinState state) {
@@ -94,7 +93,7 @@ public class HeaterMeterService {
         // 0.5 Wh --> 2000 imp/hour @ 1 kWh --> 1.8sec / impulse
 
         double timeInSecs = pulseGap.toMillis() / 1000.0;
-        double power = 1000.0 * 1.8 / timeInSecs;
+        power = 1000.0 * 1.8 / timeInSecs;
 
         // y=(-cos(x*pi)+1)/2 from 0 to 1  --> steady increase from 0 to 1
         // solve for x: 2*asin(sqrt(y))/PI --> not sure why, wolfram alpha solved it like this
@@ -102,7 +101,13 @@ public class HeaterMeterService {
         double y = power / 1130.0;
         double x = 2.0 * asin(sqrt(y))/PI;
 
-        pfcLevel = (int) (0.5 + 100 * x); // add 0.5 to round properly to closest int
+        int newPfcLevel = (int) (0.5 + 100 * x); // add 0.5 to round properly to closest int
+
+        if (pfcLevel != newPfcLevel) {
+            log.info("Consumption: " + (int)power + " W - PFC level: " + pfcLevel);
+        }
+
+        pfcLevel = newPfcLevel;
 
 //        10           : 25
 //        20           : 93
@@ -115,8 +120,6 @@ public class HeaterMeterService {
 //        90           : 1102
 //        100          : 1128
 
-
-//        log.info("Consumption: " + (int)power + " W - PFC levels: " + pfcLevel + "/" + sinPfcLevel);
     }
 
     private static boolean isBetween(Duration pulseTime, Duration minPulseTime, Duration maxPulseTime) {
