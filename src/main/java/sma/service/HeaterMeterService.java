@@ -30,10 +30,10 @@ public class HeaterMeterService {
 
     private Instant lastOn = Instant.MIN;
 
-    private double power = 0;
-    private double wattHours = 0;
-    private Instant startTime = Instant.now();
-    private int pfcLevel;
+    private volatile double power = 0;
+    private volatile double wattHours = 0;
+    private volatile int pfcLevel;
+    private volatile Instant startTime = Instant.now();
 
     public HeaterMeterService(GpioController controller, Pin sZeroBusInput) {
 
