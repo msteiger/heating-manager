@@ -20,10 +20,12 @@ import com.pi4j.io.gpio.event.GpioPinListenerDigital;
 
 public class HeaterMeterService {
 
+    private static final double MAX_POWER = 1130.0;
+
     private static final Logger log = LoggerFactory.getLogger(HeaterMeterService.class);
 
-    protected static final Duration MIN_PULSE_TIME = Duration.ofMillis(30);   // according to docs: 80ms
-    protected static final Duration MAX_PULSE_TIME = Duration.ofMillis(130);  // according to docs: 80ms
+    protected static final Duration MIN_PULSE_TIME = Duration.ofMillis(25);   // according to docs: 80ms
+    protected static final Duration MAX_PULSE_TIME = Duration.ofMillis(135);  // according to docs: 80ms
 
     protected static final Duration MIN_PULSE_GAP = Duration.ofMillis(100);
     protected static final Duration MAX_PULSE_GAP = Duration.ofHours(1);
@@ -71,7 +73,9 @@ public class HeaterMeterService {
 
         if (state == PinState.LOW) {
             if (!isBetween(pulseTime, MIN_PULSE_GAP, MAX_PULSE_GAP)) {
-                log.info("Invalid pulse gap: " + pulseTime);
+                if (!Instant.MIN.equals(lastOn)) {
+                    log.info("Invalid pulse gap: " + pulseTime.toMillis() + " ms.");
+                }
             } else {
                 handlePulse(pulseTime);
             }
@@ -81,7 +85,7 @@ public class HeaterMeterService {
         if (state == PinState.HIGH) {
             if (!isBetween(pulseTime, MIN_PULSE_TIME, MAX_PULSE_TIME)) {
                 log.info("Invalid pulse length: " + pulseTime);
-                lastOn = Instant.MIN;
+                lastOn = Instant.MIN;  // reset
             }
         }
     }
@@ -98,13 +102,17 @@ public class HeaterMeterService {
         // y=(-cos(x*pi)+1)/2 from 0 to 1  --> steady increase from 0 to 1
         // solve for x: 2*asin(sqrt(y))/PI --> not sure why, wolfram alpha solved it like this
 
-        double y = power / 1130.0;
+        if (power > MAX_POWER) {
+            log.info("Too much power consumption: {}/{}", power, MAX_POWER);
+        }
+
+        double y = Math.min(1.0, power / MAX_POWER);
         double x = 2.0 * asin(sqrt(y))/PI;
 
         int newPfcLevel = (int) (0.5 + 100 * x); // add 0.5 to round properly to closest int
 
         if (pfcLevel != newPfcLevel) {
-            log.info("Consumption: " + (int)power + " W - PFC level: " + pfcLevel);
+            log.info("Consumption: " + (int)power + " W - PFC level: " + newPfcLevel);
         }
 
         pfcLevel = newPfcLevel;
