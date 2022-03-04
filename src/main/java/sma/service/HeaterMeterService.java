@@ -20,7 +20,9 @@ import com.pi4j.io.gpio.event.GpioPinListenerDigital;
 
 public class HeaterMeterService {
 
-    private static final double MAX_POWER = 1130.0;
+    private static final double PULSE_PER_WH = 0.5;  // YEM015SD device: 0.5 Wh/impulse
+
+    private static final double MAX_POWER = 1130.0;  // 1200 Watt according to docs
 
     private static final Logger log = LoggerFactory.getLogger(HeaterMeterService.class);
 
@@ -63,6 +65,10 @@ public class HeaterMeterService {
         return pfcLevel;
     }
 
+    public int getMaxPfcLevel() {
+        return findMaxPfcLevel(PULSE_PER_WH);
+    }
+
     public double getPower() {
         return power;
     }
@@ -92,42 +98,67 @@ public class HeaterMeterService {
 
     private void handlePulse(Duration pulseGap) {
 
-        wattHours += 0.5;  // YEM015SD device: 0.5 Wh/impulse
-
-        // 0.5 Wh --> 2000 imp/hour @ 1 kWh --> 1.8sec / impulse
+        wattHours += PULSE_PER_WH;
 
         double timeInSecs = pulseGap.toMillis() / 1000.0;
-        power = 1000.0 * 1.8 / timeInSecs;
+
+        double newPower = durationToPower(timeInSecs, PULSE_PER_WH);
+
+        if (newPower > MAX_POWER) {
+            log.info("Too much power consumption: {}/{}", newPower, MAX_POWER);
+        }
+
+        int newPfcLevel = powerToPfcLevel(newPower);
+
+        if (pfcLevel != newPfcLevel) {
+            log.info("Consumption: " + (int)newPower + " W - PFC level: " + newPfcLevel);
+        }
+
+        pfcLevel = newPfcLevel;
+        power = newPower;
+    }
+
+    private int findMaxPfcLevel(double pulsePerWh) {
+        if (Instant.MIN.equals(lastOn)) {
+            return 0;
+        }
+
+        Instant now = Instant.now();
+        Duration pulseTime = Duration.between(lastOn, now);
+
+        double timeInSecs = pulseTime.toMillis() / 1000.0;
+        double maxPower = durationToPower(timeInSecs, pulsePerWh);
+
+        return powerToPfcLevel(maxPower);
+    }
+
+    private static double durationToPower(double timeInSecs, double pulsePerWh) {
+        // 0.5 Wh --> 2000 imp/hour @ 1 kWh --> 1.8sec / impulse
+        double newPower = 3600.0 * pulsePerWh / timeInSecs;
+        return newPower;
+    }
+
+    private static int powerToPfcLevel(double newPower) {
 
         // y=(-cos(x*pi)+1)/2 from 0 to 1  --> steady increase from 0 to 1
         // solve for x: 2*asin(sqrt(y))/PI --> not sure why, wolfram alpha solved it like this
 
-        if (power > MAX_POWER) {
-            log.info("Too much power consumption: {}/{}", power, MAX_POWER);
-        }
+        //   10   :   25
+        //   20   :   93
+        //   30   :  221
+        //   40   :  392
+        //   50   :  577
+        //   60   :  755
+        //   70   :  924
+        //   80   : 1053
+        //   90   : 1102
+        //  100   : 1128
 
-        double y = Math.min(1.0, power / MAX_POWER);
+        double y = Math.min(1.0, newPower / MAX_POWER);
         double x = 2.0 * asin(sqrt(y))/PI;
 
         int newPfcLevel = (int) (0.5 + 100 * x); // add 0.5 to round properly to closest int
-
-        if (pfcLevel != newPfcLevel) {
-            log.info("Consumption: " + (int)power + " W - PFC level: " + newPfcLevel);
-        }
-
-        pfcLevel = newPfcLevel;
-
-//        10           : 25
-//        20           : 93
-//        30           : 221
-//        40           : 392
-//        50           : 577
-//        60           : 755
-//        70           : 924
-//        80           : 1053
-//        90           : 1102
-//        100          : 1128
-
+        return newPfcLevel;
     }
 
     private static boolean isBetween(Duration pulseTime, Duration minPulseTime, Duration maxPulseTime) {

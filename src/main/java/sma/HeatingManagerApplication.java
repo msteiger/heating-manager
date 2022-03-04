@@ -44,6 +44,7 @@ public class HeatingManagerApplication {
         Supplier<Map<String, Object>> dataProvider = () -> {
             return Map.<String, Object>of(
                     "pfcLevel", heaterMeter.getPfcLevel(),
+                    "maxPfcLevel", heaterMeter.getMaxPfcLevel(),
                     "currentPower", heaterMeter.getPower(),
                     "startTime", heaterMeter.getStartTime(),
                     "totalEnergyWh", heaterMeter.getWattHours()
