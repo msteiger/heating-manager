@@ -62,6 +62,13 @@ public class HeaterMeterService {
     }
 
     public int getPfcLevel() {
+        int maxPfcLevel = getMaxPfcLevel(); // maximum possible level (if next pulse comes now)
+
+        // if time to last pulse is larger than the time between the last two pulses, the PFC level must be lower
+        return pfcLevel < maxPfcLevel ? pfcLevel : maxPfcLevel;
+    }
+
+    public int getRawPfcLevel() {
         return pfcLevel;
     }
 
