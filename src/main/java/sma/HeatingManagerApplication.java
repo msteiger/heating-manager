@@ -47,6 +47,7 @@ public class HeatingManagerApplication {
                     "rawPfcLevel", heaterMeter.getRawPfcLevel(),
                     "maxPfcLevel", heaterMeter.getMaxPfcLevel(),
                     "currentPower", heaterMeter.getPower(),
+                    "currentRawPower", heaterMeter.getRawPower(),
                     "startTime", heaterMeter.getStartTime(),
                     "totalEnergyWh", heaterMeter.getWattHours()
                     );

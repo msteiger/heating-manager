@@ -68,15 +68,23 @@ public class HeaterMeterService {
         return pfcLevel < maxPfcLevel ? pfcLevel : maxPfcLevel;
     }
 
+    public double getPower() {
+        double maxPower = findMaxPower();
+
+        // if time to last pulse is larger than the time between the last two pulses, the power value must be lower
+        return power < maxPower ? power : maxPower;
+    }
+
     public int getRawPfcLevel() {
         return pfcLevel;
     }
 
     public int getMaxPfcLevel() {
-        return findMaxPfcLevel(PULSE_PER_WH);
+        double maxPower = findMaxPower();
+        return powerToPfcLevel(maxPower);
     }
 
-    public double getPower() {
+    public double getRawPower() {
         return power;
     }
 
@@ -109,7 +117,7 @@ public class HeaterMeterService {
 
         double timeInSecs = pulseGap.toMillis() / 1000.0;
 
-        double newPower = durationToPower(timeInSecs, PULSE_PER_WH);
+        double newPower = durationToPower(timeInSecs);
 
         if (newPower > MAX_POWER) {
             log.info("Too much power consumption: {}/{}", newPower, MAX_POWER);
@@ -125,7 +133,7 @@ public class HeaterMeterService {
         power = newPower;
     }
 
-    private int findMaxPfcLevel(double pulsePerWh) {
+    private double findMaxPower() {
         if (Instant.MIN.equals(lastOn)) {
             return 0;
         }
@@ -134,14 +142,14 @@ public class HeaterMeterService {
         Duration pulseTime = Duration.between(lastOn, now);
 
         double timeInSecs = pulseTime.toMillis() / 1000.0;
-        double maxPower = durationToPower(timeInSecs, pulsePerWh);
+        double maxPower = durationToPower(timeInSecs);
 
-        return powerToPfcLevel(maxPower);
+        return maxPower;
     }
 
-    private static double durationToPower(double timeInSecs, double pulsePerWh) {
+    private static double durationToPower(double timeInSecs) {
         // 0.5 Wh --> 2000 imp/hour @ 1 kWh --> 1.8sec / impulse
-        double newPower = 3600.0 * pulsePerWh / timeInSecs;
+        double newPower = 3600.0 * PULSE_PER_WH / timeInSecs;
         return newPower;
     }
 
