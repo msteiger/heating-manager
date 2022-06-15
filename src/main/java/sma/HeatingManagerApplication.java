@@ -50,6 +50,8 @@ public class HeatingManagerApplication {
         int temperatureTimer = 0;
         boolean temperatureStop = false;
 
+        boolean inSleepMode = false;
+
         Supplier<Map<String, Object>> dataProvider = () -> {
             return Map.<String, Object>of(
                     "pfcLevel", heaterMeter.getPfcLevel(),
@@ -71,13 +73,25 @@ public class HeatingManagerApplication {
 
         boolean logIdleDead = true;
         boolean logIdleMax = true;
+        boolean logIdleMin = true;
 
         while (true) {
             try {
                 LocalTime time = LocalTime.now();
                 if (time.getHour() > 21 || time.getHour() < 6) {
+                    if (!inSleepMode) {
+                        log.info("Going to sleep ...");
+                        heater.resetToZero();
+                        estimatedValue = -1;
+                        inSleepMode = true;
+                    }
                     Thread.sleep(60_000);
                     continue;
+                }
+
+                if (inSleepMode) {
+                    log.info("Time to wake up!");
+                    inSleepMode = false;
                 }
 
                 // check every 10th iteration if temperature is still below maximum
@@ -111,7 +125,7 @@ public class HeatingManagerApplication {
                         logIdleMax = true;
                         log.info("Up to [{}] || Power: {} Watt", estimatedValue * 10, surplus);
                     } else {
-                        if (logIdleMax) log.info("Enter idle mode because maximum (100) is reached: {} Watt", surplus);
+                        if (logIdleMax) log.info("Enter idle mode because maximum (110) is reached: {} Watt", surplus);
                         logIdleMax = false;
                     }
                 } else if (surplus < 0) {
@@ -119,16 +133,15 @@ public class HeatingManagerApplication {
                     if (estimatedValue > -1) {
                         heater.down();
                         estimatedValue--;
-                        logIdleMax = true;
+                        logIdleMin = true;
                         log.info("Down to [{}] || Power: {} Watt", estimatedValue * 10, surplus);
                     } else {
-                        if (logIdleMax) log.info("Enter idle mode because minimum (0) is reached: {} Watt", surplus);
-                        logIdleMax = false;
+                        if (logIdleMin) log.info("Enter idle mode because minimum (-10) is reached: {} Watt", surplus);
+                        logIdleMin = false;
                     }
                 } else {
                     if (logIdleDead) log.info("Enter idle mode due to dead zone: {} Watt", surplus);
                     logIdleDead = false;
-                    logIdleMax = true;
                 }
             } catch (IOException e) {
                 log.error("Failed to connect: {}", e.toString());
@@ -138,7 +151,7 @@ public class HeatingManagerApplication {
 
             // log something every now and then
             if (logPingTimer++ % 120 == 0) {
-                log.info("Ping! Running at estimated level: {}", estimatedValue * 10);
+                log.info("Running at estimated level: {}", estimatedValue * 10);
             }
 
             Thread.sleep(5_000);
