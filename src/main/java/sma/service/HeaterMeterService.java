@@ -126,7 +126,7 @@ public class HeaterMeterService {
         int newPfcLevel = powerToPfcLevel(newPower);
 
         if (pfcLevel != newPfcLevel) {
-            log.info("Consumption: " + (int)newPower + " W - PFC level: " + newPfcLevel);
+            log.debug("Consumption: " + (int)newPower + " W - PFC level: " + newPfcLevel);
         }
 
         pfcLevel = newPfcLevel;

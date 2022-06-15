@@ -6,6 +6,7 @@ import static com.pi4j.io.gpio.RaspiPin.GPIO_22;
 import static com.pi4j.io.gpio.RaspiPin.GPIO_27;
 
 import java.io.IOException;
+import java.time.LocalTime;
 import java.util.Map;
 import java.util.function.Supplier;
 
@@ -22,6 +23,7 @@ import sma.domain.em.DataBlock;
 import sma.service.EnergyMeterService;
 import sma.service.Heater;
 import sma.service.HeaterMeterService;
+import sma.service.TemperatureService;
 import sma.service.WebServer;
 
 
@@ -33,6 +35,9 @@ public class HeatingManagerApplication {
 
         EnergyMeterService meter = new EnergyMeterService();
 
+        String tempRoot = isWindows() ? "./" : "/sys/bus/w1/";
+        TemperatureService tempService = new TemperatureService("28-01205b7cac50", tempRoot);
+
         GpioController controller = createController();
 
         Heater heater = new Heater(controller, GPIO_22, GPIO_27, GPIO_17);
@@ -40,6 +45,10 @@ public class HeatingManagerApplication {
         HeaterMeterService heaterMeter = new HeaterMeterService(controller, GPIO_13);
 
         int estimatedValue = 0;
+
+        int logPingTimer = 0;
+        int temperatureTimer = 0;
+        boolean temperatureStop = false;
 
         Supplier<Map<String, Object>> dataProvider = () -> {
             return Map.<String, Object>of(
@@ -65,6 +74,33 @@ public class HeatingManagerApplication {
 
         while (true) {
             try {
+                LocalTime time = LocalTime.now();
+                if (time.getHour() > 21 || time.getHour() < 6) {
+                    Thread.sleep(60_000);
+                    continue;
+                }
+
+                // check every 10th iteration if temperature is still below maximum
+                if (temperatureTimer++ % 10 == 0) {
+                    float temperature = tempService.getTemperature();   // slow call, about ~2sec
+
+                    if (!temperatureStop && temperature > 60) {
+                        log.info("Max. temp reached - shutting down heater");
+                        temperatureStop = true;
+                        heater.resetToZero();
+                        estimatedValue = -1;
+                    }
+                    if (temperatureStop && temperature < 55) {
+                        log.info("Max. temp no longer reached - continuing ..");
+                        temperatureStop = false;
+                    }
+                }
+
+                if (temperatureStop) {
+                    Thread.sleep(10_000);
+                    continue;
+                }
+
                 DataBlock block = meter.waitForBroadcast();
                 double surplus = Math.floor(block.getPowerOut() - block.getPowerIn()); // round to improve formatting
                 if (surplus > 150.0) {
@@ -96,16 +132,26 @@ public class HeatingManagerApplication {
                 }
             } catch (IOException e) {
                 log.error("Failed to connect: {}", e.toString());
+                heater.resetToZero();
+                estimatedValue = -1;
+            }
+
+            // log something every now and then
+            if (logPingTimer++ % 120 == 0) {
+                log.info("Ping! Running at estimated level: {}", estimatedValue * 10);
             }
 
             Thread.sleep(5_000);
         }
     }
 
-    private static GpioController createController() {
+    private static boolean isWindows() {
         String osName = System.getProperty("os.name");
-        log.info("Detected " + osName);
-        if (osName.startsWith("Windows")) {
+        return osName.startsWith("Windows");
+    }
+
+    private static GpioController createController() {
+        if (isWindows()) {
             log.info("Using simulated GPIO provider");
             GpioFactory.setDefaultProvider(new SimulatedGpioProvider());
         } else {
