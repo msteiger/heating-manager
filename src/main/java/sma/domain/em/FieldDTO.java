@@ -23,19 +23,44 @@ public class FieldDTO {
         this.divisor = divisor;
     }
 
-    public float getValue(byte[] bytes) {
+    public int getAddress() {
+        return address;
+    }
+
+    public int getDivisor() {
+        return divisor;
+    }
+
+    public int getLength() {
+        return length;
+    }
+
+    public long getValueLong(byte[] bytes) {
+        if (divisor != 1) {
+            throw new IllegalArgumentException("must be an integer field");
+        }
+        return getValueInternal(bytes);
+    }
+
+    public float getValueFloat(byte[] bytes) {
+        return getValueInternal(bytes) / (float)divisor;
+    }
+
+    private long getValueInternal(byte[] bytes) {
         if (length == 4) {
-            return (float) bytesToUInt16(Arrays.copyOfRange(bytes, address, address + 4)) / divisor;
+            return bytesToUInt32(Arrays.copyOfRange(bytes, address, address + 4));
+        } else if (length == 8) {
+            return bytesToUInt64(Arrays.copyOfRange(bytes, address, address + 8));
         } else {
-            return (float) bytesToUInt32(Arrays.copyOfRange(bytes, address, address + 8)) / divisor;
+            throw new IllegalArgumentException("length must be 4 or 8");
         }
     }
 
-    private static int bytesToUInt16(byte[] bytes) {
+    private static int bytesToUInt32(byte[] bytes) {
         return Ints.fromByteArray(bytes);
     }
 
-    private static long bytesToUInt32(byte[] bytes) {
+    private static long bytesToUInt64(byte[] bytes) {
         return Longs.fromByteArray(bytes);
     }
 }

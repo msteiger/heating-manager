@@ -71,7 +71,6 @@ public class HeatingManagerApplication {
         heater.resetToZero();
         log.info("Reset to zero .. complete");
 
-        boolean logIdleDead = true;
         boolean logIdleMax = true;
         boolean logIdleMin = true;
 
@@ -116,9 +115,18 @@ public class HeatingManagerApplication {
                 }
 
                 DataBlock block = meter.waitForBroadcast();
+                if (block.getSerialNumber() == -1) {
+                    log.warn("Invalid data from energy meter - skipping");
+                    continue;
+                }
                 double surplus = Math.floor(block.getPowerOut() - block.getPowerIn()); // round to improve formatting
+
+                if (surplus > 100_000 || surplus < -100_000) {
+                    log.warn("Invalid surplus value '{}'- skipping", surplus);
+                    continue;
+                }
+
                 if (surplus > 150.0) {
-                    logIdleDead = true;
                     if (estimatedValue < 11) {
                         heater.up();
                         estimatedValue++;
@@ -129,7 +137,6 @@ public class HeatingManagerApplication {
                         logIdleMax = false;
                     }
                 } else if (surplus < 0) {
-                    logIdleDead = true;
                     if (estimatedValue > -1) {
                         heater.down();
                         estimatedValue--;
@@ -139,9 +146,6 @@ public class HeatingManagerApplication {
                         if (logIdleMin) log.info("Enter idle mode because minimum (-10) is reached: {} Watt", surplus);
                         logIdleMin = false;
                     }
-                } else {
-                    if (logIdleDead) log.info("Enter idle mode due to dead zone: {} Watt", surplus);
-                    logIdleDead = false;
                 }
             } catch (IOException e) {
                 log.error("Failed to connect: {}", e.toString());

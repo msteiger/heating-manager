@@ -23,76 +23,108 @@ public class DataBlock {
     private byte[] data;
 
     public DataBlock(byte[] data) {
+        int minLength = energyOutL3.getAddress() + energyOutL3.getLength();
+        if (data == null) {
+            throw new IllegalArgumentException("Data block must not be null");
+        }
+        if (data.length < minLength) {
+            throw new IllegalArgumentException("Data block too short: " + data.length + " < " + minLength);
+        }
         this.data = data;
     }
 
-    public String getSerialNumber() {
-        return String.valueOf(serialNo.getValue(data));
+    public static DataBlock fromHexString(String hex) {
+        if (hex == null || hex.isEmpty() || hex.length() % 2 != 0) {
+            throw new IllegalArgumentException("invalid hex string");
+        }
+
+        byte[] data = new byte[hex.length() / 2];
+        for (int i = 0; i < hex.length() - 1; i += 2) {
+            byte b = (byte) Integer.parseInt(hex, i, i + 2, 16);
+            data[i / 2] = b;
+        }
+        return new DataBlock(data);
+    }
+
+    public long getSerialNumber() {
+        return serialNo.getValueLong(data);
     }
 
     public float getPowerIn() {
-        return (powerIn.getValue(data));
+        // the value sometimes is "-206864000"
+        return (powerIn.getValueFloat(data));
     }
 
     public float getPowerOut() {
-        return (powerOut.getValue(data));
+        return (powerOut.getValueFloat(data));
     }
 
     public float getEnergyIn() {
-        return (energyIn.getValue(data));
+        return (energyIn.getValueFloat(data));
     }
 
     public float getEnergyOut() {
-        return (energyOut.getValue(data));
+        return (energyOut.getValueFloat(data));
     }
 
     public float getPowerInL1() {
-        return (powerInL1.getValue(data));
+        return (powerInL1.getValueFloat(data));
     }
 
     public float getPowerOutL1() {
-        return (powerOutL1.getValue(data));
+        return (powerOutL1.getValueFloat(data));
     }
 
     public float getEnergyInL1() {
-        return (energyInL1.getValue(data));
+        return (energyInL1.getValueFloat(data));
     }
 
     public float getEnergyOutL1() {
-        return (energyOutL1.getValue(data));
+        return (energyOutL1.getValueFloat(data));
     }
 
     public float getPowerInL2() {
-        return (powerInL2.getValue(data));
+        return (powerInL2.getValueFloat(data));
     }
 
     public float getPowerOutL2() {
-        return (powerOutL2.getValue(data));
+        return (powerOutL2.getValueFloat(data));
     }
 
     public float getEnergyInL2() {
-        return (energyInL2.getValue(data));
+        return (energyInL2.getValueFloat(data));
     }
 
     public float getEnergyOutL2() {
-        return (energyOutL2.getValue(data));
+        return (energyOutL2.getValueFloat(data));
     }
 
     public float getPowerInL3() {
-        return (powerInL3.getValue(data));
+        return (powerInL3.getValueFloat(data));
     }
 
     public float getPowerOutL3() {
-        return (powerOutL3.getValue(data));
+        return (powerOutL3.getValueFloat(data));
     }
 
     public float getEnergyInL3() {
-        return (energyInL3.getValue(data));
+        return (energyInL3.getValueFloat(data));
     }
 
     public float getEnergyOutL3() {
-        return (energyOutL3.getValue(data));
+        return (energyOutL3.getValueFloat(data));
     }
 
+    @Override
+    public String toString() {
+        return "DataBlock [" + byteArrayToHex(data) + "]";
+    }
 
+    private static String byteArrayToHex(byte[] a) {
+        StringBuilder sb = new StringBuilder(a.length * 2);
+        for(byte b: a) {
+           sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
+     }
 }

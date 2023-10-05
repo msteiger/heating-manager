@@ -22,7 +22,7 @@ public class HeaterMeterService {
 
     private static final double PULSE_PER_WH = 0.5;  // YEM015SD device: 0.5 Wh/impulse
 
-    private static final double MAX_POWER = 1150.0;  // 1200 Watt according to docs
+    private static final double MAX_POWER = 1160.0;  // 1200 Watt according to docs
 
     private static final Logger log = LoggerFactory.getLogger(HeaterMeterService.class);
 
